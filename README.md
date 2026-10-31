@@ -31,6 +31,15 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Antes do primeiro deploy
+
+1. Abra o app no navegador onde os dados atuais estão salvos e use **Backup JSON** para baixar uma cópia. Se esses dados estão só no navegador, faça isso antes de trocar de computador ou limpar os dados do navegador.
+2. Crie um repositório privado no GitHub e envie este projeto. Não envie arquivos `.env` nem credenciais.
+3. Importe o repositório no Vercel e crie um banco PostgreSQL gerenciado. Copie a connection string do banco.
+4. Em **Project Settings → Environment Variables**, configure `POSTGRES_URL`, `APP_PASSWORD` e `AUTH_SECRET` para Production. Use uma senha de acesso própria e um segredo aleatório longo para `AUTH_SECRET` (por exemplo, gere com `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`). Não use os valores de desenvolvimento.
+5. Faça o deploy. Abra o endereço publicado, entre com `APP_PASSWORD` e use **Restaurar Backup** para importar o JSON baixado no passo 1. A restauração substitui os dados que já estiverem no banco.
+6. Confira os lançamentos e aportes no Vercel antes de continuar usando o app. Com o banco indisponível, a versão de produção bloqueia alterações em vez de guardá-las apenas no navegador.
+
+O schema das tabelas é criado automaticamente quando a API é acessada. Um banco novo fica vazio até você importar o backup.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
