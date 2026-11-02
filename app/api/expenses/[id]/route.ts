@@ -10,7 +10,7 @@ export async function PUT(req: Request) {
     const id = new URL(req.url).pathname.split("/").pop();
     const body = await req.json();
     const r = await p.query(
-      "UPDATE expenses SET phase=$1, desc=$2, qty=$3, value=$4, status=$5 WHERE id=$6 RETURNING *",
+      'UPDATE expenses SET phase=$1, "desc"=$2, qty=$3, value=$4, status=$5 WHERE id=$6 RETURNING *',
       [body.phase, body.desc, body.qty || null, body.value || 0, body.status, id]
     );
     if (r.rowCount === 0) return NextResponse.json({ error: "Lançamento não encontrado." }, { status: 404 });
@@ -33,4 +33,3 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
 }
-

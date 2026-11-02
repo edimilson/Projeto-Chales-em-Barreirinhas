@@ -9,7 +9,7 @@ export async function PUT(req: Request) {
     const p = getPool()!;
     const id = new URL(req.url).pathname.split("/").pop();
     const body = await req.json();
-    const r = await p.query("UPDATE aportes SET date=$1, desc=$2, value=$3 WHERE id=$4 RETURNING *", [
+    const r = await p.query('UPDATE aportes SET date=$1, "desc"=$2, value=$3 WHERE id=$4 RETURNING *', [
       body.date,
       body.desc,
       body.value || 0,
@@ -35,4 +35,3 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }
 }
-

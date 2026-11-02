@@ -31,15 +31,17 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 ## Deploy on Vercel
 
-### Antes do primeiro deploy
+### Configurar PostgreSQL para produção
 
-1. Abra o app no navegador onde os dados atuais estão salvos e use **Backup JSON** para baixar uma cópia. Se esses dados estão só no navegador, faça isso antes de trocar de computador ou limpar os dados do navegador.
-2. Crie um repositório privado no GitHub e envie este projeto. Não envie arquivos `.env` nem credenciais.
-3. Importe o repositório no Vercel e crie um banco PostgreSQL gerenciado. Copie a connection string do banco.
-4. Em **Project Settings → Environment Variables**, configure `POSTGRES_URL`, `APP_PASSWORD` e `AUTH_SECRET` para Production. Use uma senha de acesso própria e um segredo aleatório longo para `AUTH_SECRET` (por exemplo, gere com `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`). Não use os valores de desenvolvimento.
-5. Faça o deploy. Abra o endereço publicado, entre com `APP_PASSWORD` e use **Restaurar Backup** para importar o JSON baixado no passo 1. A restauração substitui os dados que já estiverem no banco.
-6. Confira os lançamentos e aportes no Vercel antes de continuar usando o app. Com o banco indisponível, a versão de produção bloqueia alterações em vez de guardá-las apenas no navegador.
+O projeto usa PostgreSQL pelo pacote `pg`. As APIs criam as tabelas `expenses` e `aportes` automaticamente na primeira requisição. Em produção, o app bloqueia alterações se o banco estiver sem configuração ou indisponível; os dados nunca são tratados como salvos apenas no navegador.
 
-O schema das tabelas é criado automaticamente quando a API é acessada. Um banco novo fica vazio até você importar o backup.
+1. Antes de publicar, abra o app no navegador que contém os dados atuais e use **Backup JSON** para baixar uma cópia. Dados guardados apenas no navegador não são enviados automaticamente ao banco.
+2. No Vercel, abra **Marketplace → Storage** e instale um provedor PostgreSQL, como Neon, Supabase ou Prisma Postgres. Conecte o banco ao projeto e habilite a conexão para **Production**. O Vercel informa as variáveis de conexão do provedor no projeto.
+3. Confirme que Production recebe uma variável de conexão PostgreSQL. O código reconhece `POSTGRES_URL`, `DATABASE_URL`, `POSTGRES_PRISMA_URL`, `POSTGRES_URL_NON_POOLING`, `DATABASE_URL_POOLED`, `DATABASE_POSTGRES_URL` e `DATABASE_PRISMA_DATABASE_URL`. Não coloque a URL no código nem a envie pelo chat.
+4. Em **Project Settings → Environment Variables**, configure também `APP_PASSWORD` e `AUTH_SECRET` como valores fortes e exclusivos para Production. Gere o segredo com `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` e não reutilize os valores de desenvolvimento.
+5. Faça um novo deploy após conectar o banco ou alterar variáveis. Faça login, confirme que o app carrega e restaure o JSON pelo botão **Restaurar Backup**. Essa ação substitui os dados existentes no banco.
+6. Atualize a página e confirme que os lançamentos e aportes continuam lá. Um banco novo começa vazio até a restauração do backup.
+
+Para desenvolvimento local, copie `.env.example` para `.env.local` e preencha as variáveis localmente. Mantenha `.env.local` fora do Git.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

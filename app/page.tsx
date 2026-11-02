@@ -52,27 +52,39 @@ export default function Home() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const [resExp, resApo] = await Promise.all([fetch("/api/expenses"), fetch("/api/aportes")]);
-        if (resExp.ok && resApo.ok) {
+      let apiError = "";
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const [resExp, resApo] = await Promise.all([
+            fetch("/api/expenses", { cache: "no-store" }),
+            fetch("/api/aportes", { cache: "no-store" }),
+          ]);
+          if (!resExp.ok || !resApo.ok) {
+            const errorResponse = !resExp.ok ? resExp : resApo;
+            const errorBody = await errorResponse.json().catch(() => null);
+            throw new Error(errorBody?.error || "N\u00e3o foi poss\u00edvel carregar os dados do PostgreSQL.");
+          }
           const [exp, apo] = await Promise.all([resExp.json(), resApo.json()]);
           if (!cancelled) {
             setExpenses(exp);
             setAportes(apo);
             setIsOnline(true);
+            setLoadError("");
+            setLoaded(true);
           }
-          if (!cancelled) setLoaded(true);
           return;
+        } catch (error) {
+          apiError = error instanceof Error ? error.message : "Falha ao acessar o PostgreSQL.";
+          if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
         }
-      } catch { /* API indisponível */ }
+      }
       if (databaseRequired) {
         if (!cancelled) {
-          setLoadError("Banco PostgreSQL indisponível. Os dados não podem ser alterados neste momento.");
+          setLoadError(apiError || "Banco PostgreSQL indispon\u00edvel. Os dados n\u00e3o podem ser alterados neste momento.");
           setLoaded(true);
         }
         return;
       }
-      // Fallback local, reservado ao desenvolvimento.
       try {
         const raw = localStorage.getItem(LS_KEY);
         if (raw) {
@@ -179,59 +191,73 @@ export default function Home() {
     setShowExpenseModal(true);
   };
   const reloadFromApi = async () => {
-    const [resExp, resApo] = await Promise.all([fetch("/api/expenses"), fetch("/api/aportes")]);
-    if (resExp.ok && resApo.ok) {
-      setExpenses(await resExp.json());
-      setAportes(await resApo.json());
+    const [resExp, resApo] = await Promise.all([
+      fetch("/api/expenses", { cache: "no-store" }),
+      fetch("/api/aportes", { cache: "no-store" }),
+    ]);
+    if (!resExp.ok || !resApo.ok) {
+      const errorResponse = !resExp.ok ? resExp : resApo;
+      const errorBody = await errorResponse.json().catch(() => null);
+      throw new Error(errorBody?.error || "N\u00e3o foi poss\u00edvel atualizar os dados do PostgreSQL.");
     }
+    setExpenses(await resExp.json());
+    setAportes(await resApo.json());
+    setIsOnline(true);
+    setLoadError("");
   };
 
-  const canWrite = () => {
+  const canWrite = async () => {
     if (databaseRequired && !isOnline) {
-      showToast("Banco PostgreSQL indisponível. Nenhuma alteração foi salva.", true);
-      return false;
+      try {
+        await reloadFromApi();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Banco PostgreSQL indispon\u00edvel.";
+        setLoadError(message);
+        showToast(message + " Nenhuma altera\u00e7\u00e3o foi salva.", true);
+        return false;
+      }
     }
     return true;
   };
 
   const saveExpense = async (ev: React.FormEvent) => {
     ev.preventDefault();
-    if (!canWrite()) return;
+    if (!(await canWrite())) return;
     const value = parseFloat(expForm.value) || 0;
-    if (isOnline) {
+    if (isOnline || databaseRequired) {
       try {
         const payload = { phase: expForm.phase, desc: expForm.desc, qty: expForm.qty, value, status: expForm.status };
-        const url = editingExpense ? `/api/expenses/${editingExpense.id}` : "/api/expenses";
+        const url = editingExpense ? "/api/expenses/" + editingExpense.id : "/api/expenses";
         const res = await fetch(url, {
           method: editingExpense ? "PUT" : "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error || "Erro na requisição");
-        showToast(editingExpense ? "Lançamento atualizado no banco!" : "Novo lançamento gravado no banco!");
+        if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error || "Erro na requisi\u00e7\u00e3o");
+        showToast(editingExpense ? "Lan\u00e7amento atualizado no banco!" : "Novo lan\u00e7amento gravado no banco!");
         setShowExpenseModal(false);
         await reloadFromApi();
       } catch (err) {
-        alert("Erro ao gravar lançamento: " + (err as Error).message);
+        alert("Erro ao gravar lan\u00e7amento: " + (err as Error).message);
       }
       return;
     }
     if (editingExpense) {
       setExpenses((prev) => prev.map((p) => (p.id === editingExpense.id ? { ...editingExpense, ...expForm, value } : p)));
-      showToast("Lançamento atualizado!");
+      showToast("Lan\u00e7amento atualizado!");
     } else {
       setExpenses((prev) => [
         ...prev,
         { id: Date.now(), phase: expForm.phase, desc: expForm.desc, qty: expForm.qty, value, status: expForm.status },
       ]);
-      showToast("Novo lançamento gravado!");
+      showToast("Novo lan\u00e7amento gravado!");
     }
     setShowExpenseModal(false);
   };
   const deleteExpense = async (id: number) => {
-    if (!canWrite()) return;
+    if (!(await canWrite())) return;
     if (!confirm("Deseja realmente excluir este lançamento?")) return;
-    if (isOnline) {
+    if (isOnline || databaseRequired) {
       try {
         const res = await fetch(`/api/expenses/${id}`, { method: "DELETE" });
         if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error || "Erro ao excluir");
@@ -259,9 +285,9 @@ export default function Home() {
   };
   const saveAporte = async (ev: React.FormEvent) => {
     ev.preventDefault();
-    if (!canWrite()) return;
+    if (!(await canWrite())) return;
     const value = parseFloat(apoForm.value) || 0;
-    if (isOnline) {
+    if (isOnline || databaseRequired) {
       try {
         const payload = { date: apoForm.date, desc: apoForm.desc, value };
         const url = editingAporte ? `/api/aportes/${editingAporte.id}` : "/api/aportes";
@@ -289,9 +315,9 @@ export default function Home() {
     setShowAporteModal(false);
   };
   const deleteAporte = async (id: number) => {
-    if (!canWrite()) return;
+    if (!(await canWrite())) return;
     if (!confirm("Deseja realmente excluir este aporte?")) return;
-    if (isOnline) {
+    if (isOnline || databaseRequired) {
       try {
         const res = await fetch(`/api/aportes/${id}`, { method: "DELETE" });
         if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error || "Erro ao excluir");
@@ -315,26 +341,25 @@ export default function Home() {
     showToast("Planilha Excel gerada!");
   };
   const exportBackupJSON = async () => {
-    if (databaseRequired && !isOnline) {
-      showToast("Banco PostgreSQL indisponível. Não é possível exportar o backup.", true);
-      return;
-    }
-    if (isOnline) {
+    if (databaseRequired && !(await canWrite())) return;
+    if (isOnline || databaseRequired) {
       try {
-        const res = await fetch("/api/backup");
-        if (res.ok) {
-          const backup = await res.json();
-          download(JSON.stringify(backup, null, 2), "Chales_Barreirinhas_Backup.json", "application/json");
-          showToast("Backup JSON exportado do banco!");
-          return;
-        }
-      } catch { /* fallback abaixo */ }
+        const res = await fetch("/api/backup", { cache: "no-store" });
+        if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error || "Falha ao exportar o backup.");
+        const data = await res.json();
+        download(JSON.stringify(data, null, 2), "Chales_Barreirinhas_Backup.json", "application/json");
+        showToast("Backup JSON exportado do banco!");
+        return;
+      } catch (error) {
+        showToast("Erro ao exportar backup: " + (error instanceof Error ? error.message : "falha no PostgreSQL"), true);
+        return;
+      }
     }
     download(JSON.stringify({ expenses, aportes }, null, 2), "Chales_Barreirinhas_Backup.json", "application/json");
     showToast("Backup JSON exportado!");
   };
-  const importBackupFile = (ev: React.ChangeEvent<HTMLInputElement>) => {
-    if (!canWrite()) {
+  const importBackupFile = async (ev: React.ChangeEvent<HTMLInputElement>) => {
+    if (!(await canWrite())) {
       ev.target.value = "";
       return;
     }
@@ -345,7 +370,7 @@ export default function Home() {
       try {
         const parsed = JSON.parse(String(e.target?.result));
         if (!parsed.expenses) throw new Error("Arquivo de backup inválido.");
-        if (isOnline) {
+        if (isOnline || databaseRequired) {
           if (!confirm("Restaurar este backup vai substituir todos os lançamentos e aportes do banco. Continuar?")) return;
           const res = await fetch("/api/backup", {
             method: "POST",
@@ -368,9 +393,9 @@ export default function Home() {
     ev.target.value = "";
   };
   const resetDefaultData = async () => {
-    if (!canWrite()) return;
+    if (!(await canWrite())) return;
     if (!confirm("Resetar todos os dados ao padrão original? Os dados atuais serão substituídos.")) return;
-    if (isOnline) {
+    if (isOnline || databaseRequired) {
       try {
         const res = await fetch("/api/reset", { method: "POST" });
         if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error || "Falha ao resetar.");

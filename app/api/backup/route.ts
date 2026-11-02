@@ -34,7 +34,7 @@ export async function POST(req: Request) {
       await client.query("DELETE FROM expenses");
       await client.query("DELETE FROM aportes");
     for (const e of body.expenses) {
-      await client.query("INSERT INTO expenses (id, phase, desc, qty, value, status) VALUES ($1,$2,$3,$4,$5,$6)", [
+      await client.query('INSERT INTO expenses (id, phase, "desc", qty, value, status) VALUES ($1,$2,$3,$4,$5,$6)', [
         e.id,
         e.phase,
         e.desc,
@@ -44,7 +44,7 @@ export async function POST(req: Request) {
       ]);
     }
     for (const a of body.aportes || []) {
-      await client.query("INSERT INTO aportes (id, date, desc, value) VALUES ($1,$2,$3,$4)", [
+      await client.query('INSERT INTO aportes (id, date, "desc", value) VALUES ($1,$2,$3,$4)', [
         a.id,
         a.date,
         a.desc,

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { getPool, ensureTables, dbEnabled } from "../../db";
+import { databaseErrorMessage, getPool, ensureTables, dbEnabled } from "../../db";
+
+export const maxDuration = 60;
 
 export async function GET() {
   if (!dbEnabled()) {
@@ -11,7 +13,8 @@ export async function GET() {
     const r = await p.query("SELECT * FROM expenses ORDER BY id");
     return NextResponse.json(r.rows);
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+    console.error("Expenses API database error", (e as { code?: string })?.code || "unknown");
+    return NextResponse.json({ error: databaseErrorMessage(e) }, { status: 503 });
   }
 }
 
@@ -24,7 +27,7 @@ export async function POST(req: Request) {
     const p = getPool()!;
     const body = await req.json();
     const id = Date.now();
-    await p.query("INSERT INTO expenses (id, phase, desc, qty, value, status) VALUES ($1,$2,$3,$4,$5,$6)", [
+    await p.query('INSERT INTO expenses (id, phase, "desc", qty, value, status) VALUES ($1,$2,$3,$4,$5,$6)', [
       id,
       body.phase,
       body.desc,
@@ -35,6 +38,7 @@ export async function POST(req: Request) {
     const r = await p.query("SELECT * FROM expenses WHERE id = $1", [id]);
     return NextResponse.json(r.rows[0], { status: 201 });
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+    console.error("Expenses API database error", (e as { code?: string })?.code || "unknown");
+    return NextResponse.json({ error: databaseErrorMessage(e) }, { status: 503 });
   }
 }

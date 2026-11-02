@@ -12,7 +12,7 @@ export async function POST() {
     await p.query("DELETE FROM expenses");
     await p.query("DELETE FROM aportes");
     for (const e of defaultExpenses) {
-      await p.query("INSERT INTO expenses (id, phase, desc, qty, value, status) VALUES ($1,$2,$3,$4,$5,$6)", [
+      await p.query('INSERT INTO expenses (id, phase, "desc", qty, value, status) VALUES ($1,$2,$3,$4,$5,$6)', [
         e.id,
         e.phase,
         e.desc,
@@ -22,7 +22,7 @@ export async function POST() {
       ]);
     }
     for (const a of defaultAportes) {
-      await p.query("INSERT INTO aportes (id, date, desc, value) VALUES ($1,$2,$3,$4)", [
+      await p.query('INSERT INTO aportes (id, date, "desc", value) VALUES ($1,$2,$3,$4)', [
         a.id,
         a.date,
         a.desc,
